@@ -1,11 +1,24 @@
 {
-  "frameworks": ["ISO-27001", "DPDPA-2026"],
-  "infrastructure_rules": {
-    "allow_root_execution": false,
-    "require_volume_encryption": true,
-    "forbidden_env_strings": ["password", "secret", "token"]
-  },
-  "data_rules": {
-    "allow_plaintext_pii_in_logs": false
-  }
+  "version": "1.0",
+  "frameworks": ["ISO27001", "DPDPA"],
+  "rules": [
+    {
+      "id": "ISO-A9-01",
+      "description": "Containers must not run as root user.",
+      "target_file": "docker-compose.yml",
+      "regex": "user:\\s*root"
+    },
+    {
+      "id": "DPDPA-01",
+      "description": "Unencrypted local data volumes are forbidden.",
+      "target_file": "docker-compose.yml",
+      "regex": "\\.\/data:/var/lib/postgresql/data"
+    },
+    {
+      "id": "DPDPA-02",
+      "description": "Logs must not contain plaintext Aadhaar numbers.",
+      "target_file": "logs/app_audit.log",
+      "regex": "\\b\\d{12}\\b"
+    }
+  ]
 }

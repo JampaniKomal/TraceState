@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/jampanikomal/tracestate/pkg/rules"
 	"github.com/jampanikomal/tracestate/pkg/scanner"
 	"github.com/jampanikomal/tracestate/pkg/worm"
 	"github.com/spf13/cobra"
@@ -18,12 +19,13 @@ var scanCmd = &cobra.Command{
 		fmt.Printf("[*] Loading ruleset.json...\n")
 		fmt.Printf("[*] Deploying Wires to target: %s\n\n", targetPath)
 
-		findings, err := scanner.ScanTarget(targetPath)
-		if err != nil {
+		ruleSet := rules.LoadRules("ruleset.json")
+		if err := worm.InitializeLedger(); err != nil {
 			return err
 		}
 
-		if err := worm.InitializeLedger(); err != nil {
+		findings, err := scanner.ScanTarget(targetPath, ruleSet)
+		if err != nil {
 			return err
 		}
 

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/jampanikomal/tracestate/pkg/worm"
@@ -24,30 +23,13 @@ var initCmd = &cobra.Command{
 	},
 }
 
-var verifyLedgerCmd = &cobra.Command{
-	Use:   "verify-ledger",
-	Short: "Verifies the integrity of the local WORM ledger",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ok, err := worm.VerifyLedger()
-		if err != nil {
-			return err
-		}
-		if ok {
-			fmt.Println("[+] Ledger integrity verified.")
-			return nil
-		}
-		return fmt.Errorf("ledger integrity check failed")
-	},
-}
-
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = os.Stderr.WriteString(err.Error() + "\n")
 		os.Exit(1)
 	}
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(verifyLedgerCmd)
 }

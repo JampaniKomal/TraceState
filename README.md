@@ -7,7 +7,7 @@ TraceState is the central enforcement engine (The PSU) of our dual-repository GR
 
 ### 1. The PSU (Power Supply Unit - Core Engine)
 
-- `cmd/`: Contains the Cobra CLI framework. This acts as the terminal interface (`tracestate scan`, `tracestate ledger`).
+- `cmd/`: Contains the Cobra CLI framework. This acts as the terminal interface (`tracestate init`, `tracestate scan`, `tracestate ledger verify`).
 - `pkg/worm/`: The cryptographic vault. Handles SHA-256 hash chaining and SQLite database triggers to prevent log tampering.
 - `ruleset.json`: The dynamic "Brain". Contains the ISO 27001 and DPDPA rules.
 
@@ -23,19 +23,33 @@ TraceState is the central enforcement engine (The PSU) of our dual-repository GR
 1. Initialize the module: `go mod init github.com/jampanikomal/tracestate`
 2. Install dependencies: `go get github.com/spf13/cobra` && `go get github.com/mattn/go-sqlite3`
 3. Run a test scan: `go run main.go scan --target ../Auditable/scenarios/01-fintech-startup`
+4. Verify the ledger: `go run main.go ledger verify`
 
 ## Ruleset
 
 ```json
 {
-	"frameworks": ["ISO-27001", "DPDPA-2026"],
-	"infrastructure_rules": {
-		"allow_root_execution": false,
-		"require_volume_encryption": true,
-		"forbidden_env_strings": ["password", "secret", "token"]
-	},
-	"data_rules": {
-		"allow_plaintext_pii_in_logs": false
-	}
+	"version": "1.0",
+	"frameworks": ["ISO27001", "DPDPA"],
+	"rules": [
+		{
+			"id": "ISO-A9-01",
+			"description": "Containers must not run as root user.",
+			"target_file": "docker-compose.yml",
+			"regex": "user:\\s*root"
+		},
+		{
+			"id": "DPDPA-01",
+			"description": "Unencrypted local data volumes are forbidden.",
+			"target_file": "docker-compose.yml",
+			"regex": "\\.\/data:/var/lib/postgresql/data"
+		},
+		{
+			"id": "DPDPA-02",
+			"description": "Logs must not contain plaintext Aadhaar numbers.",
+			"target_file": "logs/app_audit.log",
+			"regex": "\\b\\d{12}\\b"
+		}
+	]
 }
 ```
