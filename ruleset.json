@@ -1,0 +1,11 @@
+{
+  "frameworks": ["ISO-27001", "DPDPA-2026"],
+  "infrastructure_rules": {
+    "allow_root_execution": false,
+    "require_volume_encryption": true,
+    "forbidden_env_strings": ["password", "secret", "token"]
+  },
+  "data_rules": {
+    "allow_plaintext_pii_in_logs": false
+  }
+}
