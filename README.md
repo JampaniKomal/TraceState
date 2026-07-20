@@ -24,6 +24,8 @@ TraceState is the central enforcement engine (The PSU) of our dual-repository GR
 2. Install dependencies: `go get github.com/spf13/cobra` && `go get github.com/mattn/go-sqlite3`
 3. Run a test scan: `go run main.go scan --target ../Auditable/scenarios/01-fintech-startup`
 4. Verify the ledger: `go run main.go ledger verify`
+5. Export a JSON report: `go run main.go export --format json`
+6. Build with Make: `make build`
 
 ## Ruleset
 

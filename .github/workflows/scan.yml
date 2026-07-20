@@ -1,0 +1,24 @@
+name: TraceState Security Scan
+
+on: [push, pull_request]
+
+jobs:
+  grc-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build TraceState
+        run: go build -o tracestate main.go
+
+      - name: Run Cryptographic Tests
+        run: go test ./... -v
+
+      - name: Execute Dry Run
+        run: ./tracestate --help

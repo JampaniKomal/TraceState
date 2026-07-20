@@ -7,13 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/jampanikomal/tracestate/pkg/scanner"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const ledgerPath = "audit_ledger.db"
+var ledgerPath = "audit_ledger.db"
 
 func InitializeLedger() error {
 	db, err := openLedger()
@@ -112,6 +114,51 @@ func VerifyLedger() (bool, error) {
 		prevHash = storedRowHash
 	}
 	return true, rows.Err()
+}
+
+func ExportLedgerJSON(outputPath string) error {
+	db, err := openLedger()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	rows, err := db.Query(`SELECT created_at, file, category, framework, message, prev_hash, row_hash FROM audit_logs ORDER BY id ASC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type exportRecord struct {
+		CreatedAt string `json:"created_at"`
+		File      string `json:"file"`
+		Category  string `json:"category"`
+		Framework string `json:"framework"`
+		Message   string `json:"message"`
+		PrevHash  string `json:"prev_hash"`
+		RowHash   string `json:"row_hash"`
+	}
+
+	var records []exportRecord
+	for rows.Next() {
+		var record exportRecord
+		if err := rows.Scan(&record.CreatedAt, &record.File, &record.Category, &record.Framework, &record.Message, &record.PrevHash, &record.RowHash); err != nil {
+			return err
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil && filepath.Dir(outputPath) != "." {
+		return err
+	}
+	return os.WriteFile(outputPath, data, 0o644)
 }
 
 func openLedger() (*sql.DB, error) {
