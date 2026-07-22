@@ -12,13 +12,97 @@
       "id": "DPDPA-01",
       "description": "Unencrypted local data volumes are forbidden.",
       "target_file": "docker-compose.yml",
-      "regex": "\\.\/data:/var/lib/postgresql/data"
+      "regex": "\\./data:/var/lib/postgresql/data"
+    },
+    {
+      "id": "ISO-A8-31",
+      "description": "Separation of Dev/Prod missing (using latest tag).",
+      "target_file": "docker-compose.yml",
+      "regex": "image:.*:latest"
+    },
+    {
+      "id": "ISO-A8-24-docker",
+      "description": "Docker socket exposed.",
+      "target_file": "docker-compose.yml",
+      "regex": "/var/run/docker\\.sock"
     },
     {
       "id": "DPDPA-02",
       "description": "Logs must not contain plaintext Aadhaar numbers.",
       "target_file": "logs/app_audit.log",
       "regex": "\\b\\d{12}\\b"
+    },
+    {
+      "id": "DPDPA-03",
+      "description": "Logs must not contain emails.",
+      "target_file": "logs/app_audit.log",
+      "regex": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+    },
+    {
+      "id": "DPDPA-04",
+      "description": "Logs must not contain plaintext passwords.",
+      "target_file": "logs/app_audit.log",
+      "regex": "password['\"]?:"
+    },
+    {
+      "id": "ISO-A8-28-01",
+      "description": "Hardcoded backdoor key in API.",
+      "target_file": "src/api.py",
+      "regex": "MASTER_BACKDOOR_KEY_2026"
+    },
+    {
+      "id": "ISO-A8-28-02",
+      "description": "Plaintext password assignment.",
+      "target_file": "src/api.py",
+      "regex": "DB_PASS\\s*=\\s*['\"]supersecretplaintext['\"]"
+    },
+    {
+      "id": "ISO-A8-28-03",
+      "description": "Plaintext SQL insert with passwords.",
+      "target_file": "src/api.py",
+      "regex": "INSERT INTO users.*plaintext_password"
+    },
+    {
+      "id": "ISO-A8-28-04",
+      "description": "Hardcoded API token in frontend.",
+      "target_file": "frontend/index.html",
+      "regex": "const\\s+API_TOKEN\\s*=\\s*['\"]MASTER_BACKDOOR_KEY_2026['\"]"
+    },
+    {
+      "id": "ISO-A8-28-05",
+      "description": "Raw payload dumped to disk.",
+      "target_file": "src/api.py",
+      "regex": "Raw payload dumped to disk"
+    },
+    {
+      "id": "ISO-A8-20-01",
+      "description": "Overly permissive CORS allow_origins.",
+      "target_file": "src/api.py",
+      "regex": "allow_origins=\\[\"\\*\"\\]"
+    },
+    {
+      "id": "ISO-A8-20-02",
+      "description": "Overly permissive CORS allow_methods.",
+      "target_file": "src/api.py",
+      "regex": "allow_methods=\\[\"\\*\"\\]"
+    },
+    {
+      "id": "ISO-A8-20-03",
+      "description": "Overly permissive CORS allow_headers.",
+      "target_file": "src/api.py",
+      "regex": "allow_headers=\\[\"\\*\"\\]"
+    },
+    {
+      "id": "ISO-A8-8-01",
+      "description": "Vulnerable library detected (psycopg2-binary==2.9.7).",
+      "target_file": "src/requirements.txt",
+      "regex": "psycopg2-binary==2\\.9\\.7"
+    },
+    {
+      "id": "ISO-A9-2-01",
+      "description": "Plaintext SQL initialization with credentials.",
+      "target_file": "src/api.py",
+      "regex": "INSERT INTO users \\(full_name, aadhaar_number, plaintext_password\\)"
     }
   ]
 }

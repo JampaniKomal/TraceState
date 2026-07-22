@@ -52,6 +52,34 @@ func ScanTarget(targetPath string, rs rules.RuleSet) ([]Finding, error) {
 	}
 	findings = append(findings, telemetryFindings...)
 
+	fmt.Println("--- [WIRE 3: SOURCE CODE SCAN] ---")
+	codeFindings, err := ScanCode(targetPath, rs)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, codeFindings...)
+
+	fmt.Println("--- [WIRE 4: NETWORK SCAN] ---")
+	networkFindings, err := ScanNetwork(targetPath, rs)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, networkFindings...)
+
+	fmt.Println("--- [WIRE 5: SUPPLY CHAIN SCAN] ---")
+	supplyChainFindings, err := ScanSupplyChain(targetPath, rs)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, supplyChainFindings...)
+
+	fmt.Println("--- [WIRE 6: DATABASE & IAM SCAN] ---")
+	databaseFindings, err := ScanDatabase(targetPath, rs)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, databaseFindings...)
+
 	fmt.Println("-------------------------------------")
 	printFindings(findings)
 	return findings, nil
