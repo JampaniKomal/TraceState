@@ -16,16 +16,27 @@ type Finding struct {
 	Message   string
 }
 
-// ScanTarget executes the available wires across the target repository.
-func ScanTarget(targetPath string, rs rules.RuleSet) ([]Finding, error) {
-	var findings []Finding
+type infrastructureWire struct{}
 
-	fmt.Println("--- [WIRE 1: INFRASTRUCTURE SCAN] ---")
+func (infrastructureWire) Name() string { return "WIRE 1: INFRASTRUCTURE SCAN" }
+
+func (infrastructureWire) Scan(targetDir string, rs rules.RuleSet) ([]Finding, error) {
+	return ScanInfrastructure(targetDir, rs)
+}
+
+// ScanInfrastructure checks docker-compose.yml for container-privilege,
+// unencrypted-volume, and exposed-socket violations. A target with no
+// docker-compose.yml simply has nothing for this wire to check - it
+// returns no findings rather than an error, so the other wires (which
+// don't depend on any container orchestration file) still run.
+func ScanInfrastructure(targetPath string, rs rules.RuleSet) ([]Finding, error) {
+	var findings []Finding
 
 	composePath := filepath.Join(targetPath, "docker-compose.yml")
 	content, err := os.ReadFile(composePath)
 	if err != nil {
-		return nil, fmt.Errorf("could not attach to target infrastructure at %s: %w", composePath, err)
+		fmt.Printf("[SKIPPED] No docker-compose.yml found at %s\n", composePath)
+		return findings, nil
 	}
 
 	yamlData := string(content)
@@ -44,41 +55,22 @@ func ScanTarget(targetPath string, rs rules.RuleSet) ([]Finding, error) {
 			findings = append(findings, finding)
 		}
 	}
+	return findings, nil
+}
 
-	fmt.Println("--- [WIRE 2: TELEMETRY SCAN] ---")
-	telemetryFindings, err := ScanLogs(targetPath, rs)
-	if err != nil {
-		return nil, err
-	}
-	findings = append(findings, telemetryFindings...)
+// ScanTarget runs every registered wire against targetPath, in
+// registration order, and returns the combined findings.
+func ScanTarget(targetPath string, rs rules.RuleSet) ([]Finding, error) {
+	var findings []Finding
 
-	fmt.Println("--- [WIRE 3: SOURCE CODE SCAN] ---")
-	codeFindings, err := ScanCode(targetPath, rs)
-	if err != nil {
-		return nil, err
+	for _, wire := range registeredWires {
+		fmt.Printf("--- [%s] ---\n", wire.Name())
+		wireFindings, err := wire.Scan(targetPath, rs)
+		if err != nil {
+			return nil, err
+		}
+		findings = append(findings, wireFindings...)
 	}
-	findings = append(findings, codeFindings...)
-
-	fmt.Println("--- [WIRE 4: NETWORK SCAN] ---")
-	networkFindings, err := ScanNetwork(targetPath, rs)
-	if err != nil {
-		return nil, err
-	}
-	findings = append(findings, networkFindings...)
-
-	fmt.Println("--- [WIRE 5: SUPPLY CHAIN SCAN] ---")
-	supplyChainFindings, err := ScanSupplyChain(targetPath, rs)
-	if err != nil {
-		return nil, err
-	}
-	findings = append(findings, supplyChainFindings...)
-
-	fmt.Println("--- [WIRE 6: DATABASE & IAM SCAN] ---")
-	databaseFindings, err := ScanDatabase(targetPath, rs)
-	if err != nil {
-		return nil, err
-	}
-	findings = append(findings, databaseFindings...)
 
 	fmt.Println("-------------------------------------")
 	printFindings(findings)

@@ -17,7 +17,7 @@ TraceState takes the security of our engine seriously. Because we handle cryptog
 ## Reporting a Problem
 
 If you discover a security vulnerability within TraceState, please DO NOT open a public issue. 
-Instead, please send an email directly to the maintainers or use the private GitHub Security Advisory feature.
+Instead, email jampanikomal2005@gmail.com or use the private GitHub Security Advisory feature.
 
 Include:
 - Exact version of TraceState

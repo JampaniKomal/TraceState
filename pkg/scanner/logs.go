@@ -11,6 +11,14 @@ import (
 	"github.com/jampanikomal/tracestate/pkg/rules"
 )
 
+type telemetryWire struct{}
+
+func (telemetryWire) Name() string { return "WIRE 2: TELEMETRY SCAN" }
+
+func (telemetryWire) Scan(targetDir string, rs rules.RuleSet) ([]Finding, error) {
+	return ScanLogs(targetDir, rs)
+}
+
 func ScanLogs(targetDir string, rs rules.RuleSet) ([]Finding, error) {
 	var findings []Finding
 	for _, rule := range rs.Rules {

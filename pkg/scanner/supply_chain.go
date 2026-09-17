@@ -10,6 +10,14 @@ import (
 	"github.com/jampanikomal/tracestate/pkg/rules"
 )
 
+type supplyChainWire struct{}
+
+func (supplyChainWire) Name() string { return "WIRE 5: SUPPLY CHAIN SCAN" }
+
+func (supplyChainWire) Scan(targetDir string, rs rules.RuleSet) ([]Finding, error) {
+	return ScanSupplyChain(targetDir, rs)
+}
+
 func ScanSupplyChain(targetDir string, rs rules.RuleSet) ([]Finding, error) {
 	var findings []Finding
 	for _, rule := range rs.Rules {

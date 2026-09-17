@@ -10,6 +10,14 @@ import (
 	"github.com/jampanikomal/tracestate/pkg/rules"
 )
 
+type codeWire struct{}
+
+func (codeWire) Name() string { return "WIRE 3: SOURCE CODE SCAN" }
+
+func (codeWire) Scan(targetDir string, rs rules.RuleSet) ([]Finding, error) {
+	return ScanCode(targetDir, rs)
+}
+
 func ScanCode(targetDir string, rs rules.RuleSet) ([]Finding, error) {
 	var findings []Finding
 	for _, rule := range rs.Rules {

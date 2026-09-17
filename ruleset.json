@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "frameworks": ["ISO27001", "DPDPA"],
+  "version": "1.1",
+  "frameworks": ["ISO27001", "DPDPA", "SEBI-CSCRF", "HIPAA", "CERT-IN"],
   "rules": [
     {
       "id": "ISO-A9-01",
@@ -12,7 +12,7 @@
       "id": "DPDPA-01",
       "description": "Unencrypted local data volumes are forbidden.",
       "target_file": "docker-compose.yml",
-      "regex": "\\./data:/var/lib/postgresql/data"
+      "regex": "\\./data:/var/lib/(postgresql|mysql)/data"
     },
     {
       "id": "ISO-A8-31",
@@ -43,6 +43,12 @@
       "description": "Logs must not contain plaintext passwords.",
       "target_file": "logs/app_audit.log",
       "regex": "password['\"]?:"
+    },
+    {
+      "id": "HIPAA-01",
+      "description": "Logs must not contain plaintext Medical Record Numbers.",
+      "target_file": "logs/app_audit.log",
+      "regex": "MRN-\\d+"
     },
     {
       "id": "ISO-A8-28-01",
@@ -103,6 +109,84 @@
       "description": "Plaintext SQL initialization with credentials.",
       "target_file": "src/api.py",
       "regex": "INSERT INTO users \\(full_name, aadhaar_number, plaintext_password\\)"
+    },
+    {
+      "id": "SEBI-CSCRF-01",
+      "description": "Deprecated TLS protocol versions (TLSv1/TLSv1.1) declared in nginx configuration.",
+      "target_file": "nginx/default.conf",
+      "regex": "ssl_protocols[^;]*TLSv1\\b"
+    },
+    {
+      "id": "ISO-A8-28-06",
+      "description": "Hardcoded backdoor token default in legacy Node API.",
+      "target_file": "src/server.js",
+      "regex": "LEGACY_MASTER_OVERRIDE_2026"
+    },
+    {
+      "id": "ISO-A8-28-07",
+      "description": "Plaintext database password default in legacy Node API.",
+      "target_file": "src/server.js",
+      "regex": "DB_PASS\\s*\\|\\|\\s*['\"]plaintextroot['\"]"
+    },
+    {
+      "id": "ISO-A8-28-08",
+      "description": "Raw financial payload dumped to disk.",
+      "target_file": "src/server.js",
+      "regex": "Raw payload dumped to disk"
+    },
+    {
+      "id": "ISO-A8-28-09",
+      "description": "Hardcoded API token in legacy frontend.",
+      "target_file": "frontend/index.html",
+      "regex": "const\\s+API_TOKEN\\s*=\\s*['\"]LEGACY_MASTER_OVERRIDE_2026['\"]"
+    },
+    {
+      "id": "ISO-A9-2-02",
+      "description": "Plaintext financial record insert with card PAN and temp password.",
+      "target_file": "src/server.js",
+      "regex": "INSERT INTO employee_accounts"
+    },
+    {
+      "id": "ISO-A8-8-02",
+      "description": "Dependency with a known, current CVE (mysql2 auth-plugin downgrade, GHSA-3f6p-5ww8-9rcr).",
+      "target_file": "src/package.json",
+      "regex": "\"mysql2\":\\s*\"3\\.11\\.2\""
+    },
+    {
+      "id": "ISO-A8-28-10",
+      "description": "Hardcoded master bypass token default in healthcare broker.",
+      "target_file": "src/app.py",
+      "regex": "CERTIN_MASTER_BYPASS_2026"
+    },
+    {
+      "id": "ISO-A8-28-11",
+      "description": "Patient/telemetry payload dumped to disk in cleartext.",
+      "target_file": "src/app.py",
+      "regex": "Raw payload dumped to disk|logged in cleartext"
+    },
+    {
+      "id": "ISO-A8-28-12",
+      "description": "Hardcoded API token in healthcare dashboard.",
+      "target_file": "dashboard/index.html",
+      "regex": "const\\s+API_TOKEN\\s*=\\s*['\"]CERTIN_MASTER_BYPASS_2026['\"]"
+    },
+    {
+      "id": "ISO-A8-20-04",
+      "description": "Overly permissive CORS allow_origins in healthcare broker.",
+      "target_file": "src/app.py",
+      "regex": "allow_origins=\\[\"\\*\"\\]"
+    },
+    {
+      "id": "ISO-A8-20-05",
+      "description": "Overly permissive CORS allow_methods in healthcare broker.",
+      "target_file": "src/app.py",
+      "regex": "allow_methods=\\[\"\\*\"\\]"
+    },
+    {
+      "id": "ISO-A8-20-06",
+      "description": "Overly permissive CORS allow_headers in healthcare broker.",
+      "target_file": "src/app.py",
+      "regex": "allow_headers=\\[\"\\*\"\\]"
     }
   ]
 }

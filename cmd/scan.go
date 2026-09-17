@@ -19,7 +19,10 @@ var scanCmd = &cobra.Command{
 		fmt.Printf("[*] Loading ruleset.json...\n")
 		fmt.Printf("[*] Deploying Wires to target: %s\n\n", targetPath)
 
-		ruleSet := rules.LoadRules("ruleset.json")
+		ruleSet, err := rules.LoadRules("ruleset.json")
+		if err != nil {
+			return err
+		}
 		if err := worm.InitializeLedger(); err != nil {
 			return err
 		}

@@ -2,6 +2,7 @@ package rules
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -18,15 +19,15 @@ type RuleSet struct {
 	Rules      []Rule   `json:"rules"`
 }
 
-func LoadRules(filePath string) RuleSet {
+func LoadRules(filePath string) (RuleSet, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		panic(err)
+		return RuleSet{}, fmt.Errorf("could not read ruleset at %s: %w", filePath, err)
 	}
 
 	var rs RuleSet
 	if err := json.Unmarshal(content, &rs); err != nil {
-		panic(err)
+		return RuleSet{}, fmt.Errorf("could not parse ruleset at %s: %w", filePath, err)
 	}
-	return rs
+	return rs, nil
 }

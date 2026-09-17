@@ -10,6 +10,14 @@ import (
 	"github.com/jampanikomal/tracestate/pkg/rules"
 )
 
+type databaseWire struct{}
+
+func (databaseWire) Name() string { return "WIRE 6: DATABASE & IAM SCAN" }
+
+func (databaseWire) Scan(targetDir string, rs rules.RuleSet) ([]Finding, error) {
+	return ScanDatabase(targetDir, rs)
+}
+
 func ScanDatabase(targetDir string, rs rules.RuleSet) ([]Finding, error) {
 	var findings []Finding
 	for _, rule := range rs.Rules {

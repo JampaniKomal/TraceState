@@ -10,6 +10,14 @@ import (
 	"github.com/jampanikomal/tracestate/pkg/rules"
 )
 
+type networkWire struct{}
+
+func (networkWire) Name() string { return "WIRE 4: NETWORK SCAN" }
+
+func (networkWire) Scan(targetDir string, rs rules.RuleSet) ([]Finding, error) {
+	return ScanNetwork(targetDir, rs)
+}
+
 func ScanNetwork(targetDir string, rs rules.RuleSet) ([]Finding, error) {
 	var findings []Finding
 	for _, rule := range rs.Rules {

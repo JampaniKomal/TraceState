@@ -24,7 +24,7 @@ Examples of unacceptable behavior:
 
 ## Enforcement
 
-Project maintainers may remove, edit, or reject contributions and comments that do not align with this code of conduct.
+Project maintainers may remove, edit, or reject contributions and comments that do not align with this code of conduct. Instances of unacceptable behavior may be reported to jampanikomal2005@gmail.com.
 
 ## Scope
 
