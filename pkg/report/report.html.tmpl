@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="{{.Tool}} {{.Version}}">
+<title>{{.Tool}} report · {{.Target}}</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #dde1e6;
+  --code-bg: #f0f2f5; --accent: #2f5bd3;
+  --critical: #8e24aa; --high: #d32f2f; --medium: #c77700; --low: #00838f; --info: #607080;
+  --failed-bg: #fde8e8; --failed-fg: #a61b1b;
+  --passed-bg: #e3f5e8; --passed-fg: #1d6b35;
+  --na-bg: #eceff2; --na-fg: #56606b;
+  --ne-bg: #fff3dc; --ne-fg: #8a5a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216; --panel: #171b21; --text: #e4e8ed; --muted: #97a1ad; --line: #2a3038;
+    --code-bg: #20252d; --accent: #7aa2ff;
+    --critical: #d67ee8; --high: #ff6b6b; --medium: #f0b44c; --low: #4fd1dc; --info: #9aa8b6;
+    --failed-bg: #3a1a1c; --failed-fg: #ff9a9a;
+    --passed-bg: #16301f; --passed-fg: #8fe0a8;
+    --na-bg: #242a31; --na-fg: #a3adb8;
+    --ne-bg: #372b12; --ne-fg: #f3c56f;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 12px; }
+h3 { font-size: 16px; margin: 0; }
+p { margin: 8px 0; }
+a { color: var(--accent); }
+code { font: 13px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 16px 0 0; font-size: 14px; }
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; overflow-wrap: anywhere; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.card .n { font-size: 28px; font-weight: 650; line-height: 1.1; }
+.card .l { color: var(--muted); font-size: 13px; }
+.card.sev { border-top: 4px solid var(--c); }
+.card.sev .n { color: var(--c); }
+.sev-critical { --c: var(--critical); } .sev-high { --c: var(--high); } .sev-medium { --c: var(--medium); }
+.sev-low { --c: var(--low); } .sev-info { --c: var(--info); }
+.badge { display: inline-block; min-width: 70px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; color: #fff; background: var(--c); }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+.pill.failed { background: var(--failed-bg); color: var(--failed-fg); }
+.pill.passed { background: var(--passed-bg); color: var(--passed-fg); }
+.pill.not_applicable { background: var(--na-bg); color: var(--na-fg); }
+.pill.not_evaluated { background: var(--ne-bg); color: var(--ne-fg); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+.scroll { overflow-x: auto; }
+.scroll > table { min-width: 640px; }
+td code, .nw { white-space: nowrap; overflow-wrap: normal; }
+td.ev code { white-space: pre-wrap; overflow-wrap: anywhere; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+thead th { border-top: 0; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--panel); }
+td.num, th.num { text-align: right; }
+details > summary { cursor: pointer; list-style: none; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸"; color: var(--muted); width: 10px; }
+details[open] > summary::before { content: "▾"; }
+details[open] > summary { border-bottom: 1px solid var(--line); }
+.fw-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+.fw-head .counts { display: flex; gap: 6px; flex-wrap: wrap; }
+.rule-body { padding: 4px 16px 16px; }
+.rule-body table { margin: 8px 0; }
+.rule-body th:first-child, .rule-body td:first-child { padding-left: 0; }
+.remediation { border-left: 3px solid var(--accent); padding: 4px 12px; margin-top: 12px; }
+.filters { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; font-size: 14px; }
+.filters label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.toolbar { display: flex; gap: 8px; margin-left: auto; }
+button { font: inherit; font-size: 13px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.empty { padding: 24px; text-align: center; color: var(--passed-fg); background: var(--passed-bg); border-radius: 10px; }
+.note { font-size: 13px; color: var(--muted); }
+footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+body:has(#show-critical:not(:checked)) .group.sev-critical,
+body:has(#show-high:not(:checked)) .group.sev-high,
+body:has(#show-medium:not(:checked)) .group.sev-medium,
+body:has(#show-low:not(:checked)) .group.sev-low,
+body:has(#show-info:not(:checked)) .group.sev-info { display: none; }
+@media (max-width: 640px) {
+  .meta { grid-template-columns: 1fr; }
+  .meta dt { margin-top: 6px; }
+  .toolbar { margin-left: 0; }
+}
+@media print {
+  body { background: #fff; }
+  .filters, .toolbar { display: none; }
+  .panel { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Compliance report</h1>
+  <div class="muted">{{.Tool}} {{.Version}}</div>
+  <dl class="meta">
+    <dt>Target</dt><dd><code>{{.Target}}</code></dd>
+    <dt>Scanned</dt><dd>{{.StartedAt.Format "2006-01-02 15:04:05 MST"}} · {{.DurationMS}} ms · {{.FilesIndexed}} files indexed{{if .FilesSkipped}}, {{.FilesSkipped}} skipped{{end}}</dd>
+    <dt>Rule set</dt><dd><code>sha256:{{short .RuleSetSHA256}}</code> from {{join .RuleSources ", "}}</dd>
+    {{- if .ScanID}}
+    <dt>Ledger scan</dt><dd><code>{{.ScanID}}</code></dd>
+    {{- end}}
+    <dt>Mode</dt><dd>{{if .Online}}online (dependency advisories queried){{else}}offline{{end}}</dd>
+  </dl>
+</header>
+
+<section class="cards" aria-label="Summary">
+  <div class="card"><div class="n">{{.Summary.Total}}</div><div class="l">findings in {{.Summary.FilesAffected}} file(s)</div></div>
+  {{- $s := .Summary}}
+  {{- range severities}}
+  <div class="card sev sev-{{.}}"><div class="n">{{count $s.BySeverity .}}</div><div class="l">{{.}}</div></div>
+  {{- end}}
+</section>
+<section class="cards" aria-label="Rules">
+  <div class="card"><div class="n">{{.Summary.RulesFailed}}</div><div class="l"><span class="pill failed">failed</span> rules</div></div>
+  <div class="card"><div class="n">{{.Summary.RulesPassed}}</div><div class="l"><span class="pill passed">passed</span> rules</div></div>
+  <div class="card"><div class="n">{{.Summary.RulesNA}}</div><div class="l"><span class="pill not_applicable">not applicable</span></div></div>
+  <div class="card"><div class="n">{{.Summary.RulesSkipped}}</div><div class="l"><span class="pill not_evaluated">not evaluated</span></div></div>
+  {{- if .Summary.Suppressed}}
+  <div class="card"><div class="n">{{.Summary.Suppressed}}</div><div class="l">suppressed inline</div></div>
+  {{- end}}
+</section>
+
+<h2 id="coverage">Framework coverage</h2>
+<p class="note">A control <strong>fails</strong> if any rule mapped to it found a violation and <strong>passes</strong> if at least one mapped rule was evaluated against matching files and found nothing. Passing means "no violation of these specific checks", not certification.</p>
+{{- range .Coverage}}
+<details class="panel"{{if .Failed}} open{{end}}>
+  <summary>
+    <div class="fw-head">
+      <h3>{{.Name}}</h3>
+      <span class="counts">
+        {{- if .Failed}}<span class="pill failed">{{.Failed}} failed</span>{{end}}
+        {{- if .Passed}}<span class="pill passed">{{.Passed}} passed</span>{{end}}
+        {{- if .NotApplicable}}<span class="pill not_applicable">{{.NotApplicable}} n/a</span>{{end}}
+        {{- if .NotEvaluated}}<span class="pill not_evaluated">{{.NotEvaluated}} not evaluated</span>{{end}}
+      </span>
+    </div>
+  </summary>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Control</th><th>Title</th><th>Status</th><th>Rules</th><th class="num">Findings</th></tr></thead>
+    <tbody>
+    {{- range .Controls}}
+      <tr><td><code>{{.Control}}</code></td><td>{{.Title}}</td><td><span class="pill {{.Status}}">{{status .Status}}</span></td><td>{{range $i, $r := .Rules}}{{if $i}}, {{end}}<span class="nw">{{$r}}</span>{{end}}</td><td class="num">{{.Findings}}</td></tr>
+    {{- end}}
+    </tbody>
+  </table>
+  </div>
+</details>
+{{- end}}
+
+<h2 id="findings">Findings</h2>
+{{- if .Groups}}
+<div class="filters">
+  <span class="muted">Show:</span>
+  {{- range severities}}
+  <label><input type="checkbox" id="show-{{.}}" checked> <span class="badge sev-{{.}}">{{upper .}}</span></label>
+  {{- end}}
+  <span class="toolbar"><button type="button" data-toggle="open">Expand all</button><button type="button" data-toggle="close">Collapse all</button></span>
+</div>
+{{- range .Groups}}
+<details class="panel group {{sevclass .Severity}}" open>
+  <summary>
+    <span class="badge {{sevclass .Severity}}">{{upper .Severity.String}}</span>
+    <strong>{{.Rule.ID}}</strong>
+    <span>{{.Rule.Title}}</span>
+    <span class="muted">· {{len .Findings}} location(s)</span>
+  </summary>
+  <div class="rule-body">
+    {{- if .Rule.Description}}<p>{{.Rule.Description}}</p>{{end}}
+    {{- if .Rule.Controls}}<p class="note">Controls: {{controls .Rule.Controls}}</p>{{end}}
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Location</th><th>Detail</th><th>Evidence</th></tr></thead>
+      <tbody>
+      {{- range .Findings}}
+        <tr><td><code>{{location .}}</code></td><td>{{.Message}}{{if gt .Occurrences 1}} <span class="muted">(×{{.Occurrences}})</span>{{end}}</td><td class="ev">{{if .Evidence}}<code>{{.Evidence}}</code>{{end}}</td></tr>
+      {{- end}}
+      </tbody>
+    </table>
+    </div>
+    {{- if .Rule.Remediation}}
+    <div class="remediation"><strong>Remediation.</strong> {{.Rule.Remediation}}</div>
+    {{- end}}
+  </div>
+</details>
+{{- end}}
+{{- else}}
+<div class="empty">No violations found.</div>
+{{- end}}
+
+<h2 id="rules">Rule outcomes</h2>
+<details class="panel">
+  <summary><h3>All {{len .Rules}} rules evaluated in this scan</h3></summary>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Rule</th><th>Title</th><th>Severity</th><th>Status</th><th class="num">Files</th><th class="num">Findings</th></tr></thead>
+    <tbody>
+    {{- range .Rules}}
+      <tr>
+        <td><code>{{.ID}}</code></td>
+        <td>{{.Title}}{{if .Reason}}<div class="note">{{.Reason}}</div>{{end}}</td>
+        <td><span class="badge {{sevclass .Severity}}">{{upper .Severity.String}}</span></td>
+        <td><span class="pill {{.Status}}">{{status .Status}}</span></td>
+        <td class="num">{{.FilesMatched}}</td>
+        <td class="num">{{.Findings}}</td>
+      </tr>
+    {{- end}}
+    </tbody>
+  </table>
+  </div>
+</details>
+
+<footer>
+  Generated by <a href="https://github.com/JampaniKomal/TraceState">{{.Tool}}</a> {{.Version}}.
+  Evidence is redacted at scan time; secrets and personal data never appear in full in this report.
+  {{- if .ScanID}} Verify this scan's integrity with <code>tracestate ledger verify</code>.{{end}}
+</footer>
+</main>
+<script>
+document.querySelectorAll("[data-toggle]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var open = b.getAttribute("data-toggle") === "open";
+    document.querySelectorAll("details.group").forEach(function (d) { d.open = open; });
+  });
+});
+window.addEventListener("beforeprint", function () {
+  document.querySelectorAll("details").forEach(function (d) { d.open = true; });
+});
+</script>
+</body>
+</html>
