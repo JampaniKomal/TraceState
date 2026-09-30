@@ -1,0 +1,82 @@
+name: TraceState compliance scan
+description: >-
+  Scan a repository against policy-as-code security and compliance rules
+  (ISO 27001, DPDP Act, PCI DSS, HIPAA, OWASP...). Writes SARIF for code
+  scanning and a Markdown report to the job summary.
+author: Jampani Komal
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: Directory to scan, relative to the workspace.
+    default: "."
+  fail-on:
+    description: Fail the step on findings at or above this severity (critical, high, medium, low, info, none).
+    default: high
+  rules:
+    description: Extra rule files, one per line. A rule with a built-in ID overrides the built-in rule.
+    default: ""
+  no-default-rules:
+    description: Set to true to use only the rule files given in `rules`.
+    default: "false"
+  exclude:
+    description: Globs to leave out of the scan, one per line (for example `tests/**`).
+    default: ""
+  online:
+    description: Set to true to look up dependency advisories on OSV.dev.
+    default: "false"
+  ledger:
+    description: Ledger file to record the scan in. Empty means no ledger.
+    default: ""
+  sarif-file:
+    description: Where to write the SARIF report.
+    default: tracestate.sarif
+  markdown-file:
+    description: Where to write the Markdown report.
+    default: tracestate.md
+  summary:
+    description: Set to false to skip writing the report to the job summary.
+    default: "true"
+  version:
+    description: >-
+      TraceState release to install (for example v2.0.0), `latest`, or
+      `source` to build the checked-out action with the Go toolchain on the
+      runner.
+    default: latest
+
+outputs:
+  exit-code:
+    description: "The scan's exit code: 0 clean, 1 findings at or above fail-on, 2 error."
+    value: ${{ steps.scan.outputs.exit-code }}
+  sarif-file:
+    description: Path of the SARIF report.
+    value: ${{ steps.scan.outputs.sarif-file }}
+  markdown-file:
+    description: Path of the Markdown report.
+    value: ${{ steps.scan.outputs.markdown-file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install TraceState
+      shell: bash
+      env:
+        TS_VERSION: ${{ inputs.version }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/action-install.sh"
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        TS_PATH: ${{ inputs.path }}
+        TS_FAIL_ON: ${{ inputs.fail-on }}
+        TS_RULES: ${{ inputs.rules }}
+        TS_NO_DEFAULT_RULES: ${{ inputs.no-default-rules }}
+        TS_EXCLUDE: ${{ inputs.exclude }}
+        TS_ONLINE: ${{ inputs.online }}
+        TS_LEDGER: ${{ inputs.ledger }}
+        TS_SARIF: ${{ inputs.sarif-file }}
+        TS_MARKDOWN: ${{ inputs.markdown-file }}
+        TS_SUMMARY: ${{ inputs.summary }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/action-scan.sh"

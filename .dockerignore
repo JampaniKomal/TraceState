@@ -1,0 +1,13 @@
+.git
+.github
+bin
+dist
+docs
+testdata
+*.db
+*.db-*
+*.key
+*.sarif
+coverage.out
+tracestate
+tracestate.exe

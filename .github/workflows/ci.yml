@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -race -coverprofile coverage.out ./...
+      - name: Coverage
+        if: runner.os == 'Linux'
+        run: go tool cover -func coverage.out | tail -n 1
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
+          fi
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14
+
+  benchmark:
+    name: Benchmark (Auditable ground truth)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check out Auditable at the benchmarked commit
+        uses: actions/checkout@v7
+        with:
+          repository: JampaniKomal/Auditable
+          ref: 146213b31204f7f7be665f6dad7bd753cd7c1357
+          path: auditable
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go build -o tracestate ./cmd/tracestate
+      - name: Every offline ground-truth detection is still reported
+        run: bash scripts/check-benchmark.sh ./tracestate auditable
+      - name: Dependency detections via OSV.dev (network-dependent)
+        continue-on-error: true
+        run: bash scripts/check-benchmark.sh ./tracestate auditable --online
+
+  self-scan:
+    name: Scan TraceState with TraceState
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Scan with this commit's GitHub Action and binary
+        id: scan
+        uses: ./
+        with:
+          version: source
+          fail-on: low
+      - name: Upload to code scanning
+        if: always() && steps.scan.outputs.sarif-file != '' && github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif-file }}
+          category: tracestate
+
+  docker:
+    name: Container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        run: docker build --build-arg VERSION=ci -t tracestate:ci .
+      - name: Scan the repository from the image
+        run: docker run --rm -v "$PWD:/src:ro" tracestate:ci scan /src --no-ledger --fail-on low
+
+  release-config:
+    name: GoReleaser config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+
+  ledger-interop:
+    name: Ledger export verifies without TraceState
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go build -o "$RUNNER_TEMP/tracestate" ./cmd/tracestate
+      - run: python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install -q cryptography
+      - name: Scan, seal, scan again, export, verify with scripts/verify-export.py
+        working-directory: ${{ runner.temp }}
+        run: |
+          ts=./tracestate py=venv/bin/python verify=$GITHUB_WORKSPACE/scripts/verify-export.py
+          $ts scan "$GITHUB_WORKSPACE" --ledger l.db --fail-on none -q >/dev/null
+          $ts ledger keygen ci -q
+          $ts ledger seal --ledger l.db --key ci.key -q
+          $ts scan "$GITHUB_WORKSPACE" --ledger l.db --fail-on none -q >/dev/null
+          $ts ledger export --ledger l.db -o l.jsonl
+          head=$($ts ledger head --ledger l.db | cut -d' ' -f1)
+          $py "$verify" l.jsonl --pubkey ci.pub --expect-head "$head"
+          echo "A tampered export must fail:"
+          sed '1s/"created_at":"2/"created_at":"1/' l.jsonl >tampered.jsonl
+          if $py "$verify" tampered.jsonl --pubkey ci.pub; then exit 1; fi
+          echo "A truncated export must fail against the anchor:"
+          head -n 2 l.jsonl >truncated.jsonl
+          if $py "$verify" truncated.jsonl --expect-head "$head"; then exit 1; fi
