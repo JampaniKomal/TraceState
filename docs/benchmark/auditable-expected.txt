@@ -1,0 +1,29 @@
+# Ground-truth detections for Auditable at commit 146213b (see docs/BENCHMARK.md).
+# One line per expected finding: <row> <rule> <file>:<line> [online]
+# Rows tagged "online" need `tracestate scan --online` (OSV.dev lookup).
+G01 TS-CTR-001 scenarios/01-fintech-startup/docker-compose.yml:6
+G02 TS-CTR-006 scenarios/01-fintech-startup/docker-compose.yml:15
+G02 TS-CTR-006 scenarios/01-fintech-startup/docker-compose.yml:31
+G03 TS-CTR-007 scenarios/01-fintech-startup/docker-compose.yml:35
+G04 TS-SEC-006 scenarios/01-fintech-startup/src/api.py:60
+G04 TS-SEC-006 scenarios/01-fintech-startup/src/api.py:68
+G05 TS-DAT-008 scenarios/01-fintech-startup/src/api.py:59
+G06 TS-SEC-004 scenarios/01-fintech-startup/frontend/index.html:46
+G07 TS-SEC-005 scenarios/01-fintech-startup/src/api.py:82
+G08 TS-LOG-001 scenarios/01-fintech-startup/src/api.py:83
+G08 TS-LOG-001 scenarios/01-fintech-startup/src/api.py:95
+G09 TS-CTR-001 scenarios/02-legacy-enterprise/docker-compose.yml:6
+G10 TS-CTR-007 scenarios/02-legacy-enterprise/docker-compose.yml:15
+G11 TS-CTR-001 scenarios/02-legacy-enterprise/docker-compose.yml:26
+G12 TS-SEC-004 scenarios/02-legacy-enterprise/frontend/index.html:185
+G13 TS-NET-002 scenarios/02-legacy-enterprise/nginx/default.conf:28
+G14 TS-DEP-001 scenarios/02-legacy-enterprise/src/package.json:12 online
+G15 TS-LOG-001 scenarios/02-legacy-enterprise/src/server.js:91
+G16 TS-DAT-008 scenarios/02-legacy-enterprise/src/server.js:49
+G16 TS-DAT-008 scenarios/02-legacy-enterprise/src/server.js:50
+G16 TS-SEC-006 scenarios/02-legacy-enterprise/src/server.js:60
+G17 TS-CTR-001 scenarios/03-healthcare-data-broker/docker-compose.yml:28
+G18 TS-CTR-003 scenarios/03-healthcare-data-broker/docker-compose.yml:32
+G19 TS-SEC-004 scenarios/03-healthcare-data-broker/dashboard/index.html:118
+G20 TS-CTR-009 scenarios/03-healthcare-data-broker/docker-compose.yml:7
+G20 TS-LOG-001 scenarios/03-healthcare-data-broker/src/app.py:85
