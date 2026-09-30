@@ -1,25 +1,31 @@
-# Security Policy
+# Security policy
 
-TraceState takes the security of our engine seriously. Because we handle cryptographic ledgers (WORM) and analyze highly sensitive compliance data, any vulnerability in our core logic could compromise an audit.
+TraceState is used as audit evidence, so a flaw that lets a finding disappear
+or a ledger change go unnoticed matters as much as a crash.
 
-## Supported Scope
+## In scope
 
-- Vulnerabilities in the core Go CLI (`main.go`, `cmd/`)
-- Bugs leading to bypassing the `pkg/worm` cryptographic hash-chain
-- Regex injection vulnerabilities in the rules engine
-- Dependencies with known High/Critical CVEs
+- Ways to alter, remove or forge ledger entries or seals that `tracestate
+  ledger verify` (or `scripts/verify-export.py`) does not report
+- Findings leaking unmasked secrets or personal data into reports or the
+  ledger
+- Crafted target files or rule files that crash the scanner, hang it
+  (catastrophic patterns), or make it read outside the target
+- Vulnerabilities in the GitHub Action, the release artifacts or their
+  provenance
+- Dependencies with known high or critical advisories
 
-## Out of Scope
+## Out of scope
 
-- Flaws in intentionally vulnerable target environments (like the `Auditable` repository)
-- General configuration issues by the end-user
+- Problems in intentionally vulnerable targets such as
+  [Auditable](https://github.com/JampaniKomal/Auditable)
+- Rules that miss something (please open a normal issue)
 
-## Reporting a Problem
+## Reporting
 
-If you discover a security vulnerability within TraceState, please DO NOT open a public issue. 
-Instead, email jampanikomal2005@gmail.com or use the private GitHub Security Advisory feature.
+Please don't open a public issue. Use GitHub's private vulnerability
+reporting ("Report a vulnerability" on the Security tab), or email
+jampanikomal2005@gmail.com. Include the version (`tracestate version`),
+steps to reproduce, and what you expected. You'll get a reply within a week.
 
-Include:
-- Exact version of TraceState
-- Reproduction steps
-- Expected versus actual result
+Only the latest release receives fixes.
