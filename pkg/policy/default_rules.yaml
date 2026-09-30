@@ -1,0 +1,436 @@
+# TraceState default rule pack (ruleset format v2).
+#
+# Every rule is generic: none of them know anything about a specific target.
+# A rule names a `check` implemented by one of the scanner wires, the files it
+# applies to (doublestar globs, relative to the scan root), a severity, and the
+# compliance controls a violation is evidence against.
+#
+# Override any rule by defining one with the same id in your own rule file
+# (`tracestate scan --rules my-rules.yaml`), or add your own `regex.match` /
+# `regex.absent` rules without writing any Go.
+
+version: 2
+
+rules:
+  # --- Containers: docker compose -------------------------------------------
+  - id: TS-CTR-001
+    title: Container runs as root
+    severity: high
+    check: compose.user_root
+    files: &compose ["**/docker-compose*.yml", "**/docker-compose*.yaml", "**/compose*.yml", "**/compose*.yaml"]
+    frameworks:
+      ISO27001: [A.8.2]
+      NIST-CSF: [PR.AA-05]
+      CIS-Docker: [non-root-user]
+      CWE: [CWE-250]
+    remediation: 'Run the service as an unprivileged user (`user: "1000:1000"` in compose, or a `USER` instruction in its Dockerfile) and drop unneeded capabilities with `cap_drop: [ALL]`.'
+
+  - id: TS-CTR-002
+    title: Privileged container
+    severity: critical
+    check: compose.privileged
+    files: *compose
+    frameworks:
+      ISO27001: [A.8.2, A.8.9]
+      CIS-Docker: [no-privileged]
+      CWE: [CWE-250]
+    remediation: 'Remove `privileged: true`. Grant only the specific capabilities or devices the workload needs.'
+
+  - id: TS-CTR-003
+    title: Docker socket mounted into a container
+    severity: critical
+    check: compose.docker_socket
+    files: *compose
+    frameworks:
+      ISO27001: [A.8.2, A.8.27]
+      OWASP: [A05]
+      CIS-Docker: [no-docker-socket]
+      CWE: [CWE-668]
+    remediation: Never mount /var/run/docker.sock into an application container; anyone who controls the container controls the host. If orchestration access is genuinely needed, put a filtering socket proxy in front of it that allows only the required read-only API calls.
+
+  - id: TS-CTR-004
+    title: Container shares a host namespace
+    severity: high
+    check: compose.host_namespace
+    files: *compose
+    frameworks:
+      ISO27001: [A.8.22]
+      CIS-Docker: [no-host-namespaces]
+    remediation: 'Remove `network_mode: host`, `pid: host` and `ipc: host` unless the workload is a node-level agent that truly requires them.'
+
+  - id: TS-CTR-005
+    title: Image is not pinned to a version
+    severity: low
+    check: compose.mutable_image_tag
+    files: *compose
+    frameworks:
+      ISO27001: [A.8.32]
+      NIST-CSF: [PR.PS-01]
+      CIS-Docker: [pinned-images]
+    remediation: Pin images to an explicit version tag, or better, an immutable digest (`image@sha256:...`), so deployments are reproducible and reviewed.
+
+  - id: TS-CTR-006
+    title: Plaintext secret in container environment
+    severity: high
+    check: compose.env_secret
+    files: *compose
+    frameworks:
+      ISO27001: [A.5.17]
+      NIST-CSF: [PR.AA-01]
+      CIS-Docker: [no-secrets-in-env]
+      CWE: [CWE-798]
+    remediation: Reference secrets from the environment (`${DB_PASSWORD}`) or use compose/Swarm/Kubernetes secrets backed by a secrets manager. Rotate any value that has been committed.
+
+  - id: TS-CTR-007
+    title: Datastore persisted to an unmanaged host path
+    severity: medium
+    check: compose.datastore_bind_mount
+    files: *compose
+    frameworks:
+      ISO27001: [A.8.24]
+      DPDPA: [s.8(5)]
+      HIPAA: [164.312(a)(2)(iv)]
+      NIST-CSF: [PR.DS-01]
+      CWE: [CWE-312]
+    remediation: Store regulated data on an encrypted volume (LUKS/dm-crypt, cloud-provider volume encryption, or the database's own TDE) and restrict host permissions on the directory. Document where encryption at rest is enforced.
+
+  - id: TS-CTR-008
+    title: Datastore port published on all interfaces
+    severity: high
+    check: compose.datastore_port_exposed
+    files: *compose
+    frameworks:
+      ISO27001: [A.8.20, A.8.22]
+      NIST-CSF: [PR.IR-01]
+      CIS-Docker: [bind-host-interface]
+    remediation: Don't publish database ports at all if only other containers need them; otherwise bind them to loopback (`"127.0.0.1:5432:5432"`).
+
+  - id: TS-CTR-009
+    title: Datastore authentication or security features disabled
+    severity: critical
+    check: compose.security_disabled
+    files: *compose
+    frameworks:
+      ISO27001: [A.8.5]
+      HIPAA: [164.312(d)]
+      NIST-CSF: [PR.AA-01]
+      CWE: [CWE-306]
+    remediation: Keep the datastore's authentication and TLS enabled (for example `xpack.security.enabled=true`), and never allow empty or trust-based passwords outside throwaway local development.
+
+  # --- Container images: Dockerfile ------------------------------------------
+  - id: TS-IMG-001
+    title: Image runs as root
+    severity: medium
+    check: dockerfile.root_user
+    files: &dockerfile ["**/Dockerfile", "**/Dockerfile.*", "**/*.Dockerfile", "**/Containerfile"]
+    frameworks:
+      ISO27001: [A.8.2]
+      CIS-Docker: [non-root-user]
+      CWE: [CWE-250]
+    remediation: Create an unprivileged user in the final stage and switch to it with `USER`.
+
+  - id: TS-IMG-002
+    title: Base image is not pinned to a version
+    severity: low
+    check: dockerfile.mutable_base_image
+    files: *dockerfile
+    frameworks:
+      ISO27001: [A.8.32]
+      CIS-Docker: [pinned-images]
+    remediation: Pin `FROM` to an explicit version, ideally by digest.
+
+  - id: TS-IMG-003
+    title: Remote file fetched with ADD
+    severity: medium
+    check: dockerfile.remote_add
+    files: *dockerfile
+    frameworks:
+      ISO27001: [A.5.21]
+      OWASP: [A08]
+      CIS-Docker: [trusted-build-inputs]
+      CWE: [CWE-829]
+    remediation: Download with `RUN curl` against a pinned URL and verify a checksum, or vendor the file into the build context.
+
+  - id: TS-IMG-004
+    title: Secret baked into image layers
+    severity: high
+    check: dockerfile.env_secret
+    files: *dockerfile
+    frameworks:
+      ISO27001: [A.5.17]
+      CIS-Docker: [no-secrets-in-env]
+      CWE: [CWE-798]
+    remediation: ENV and ARG values are stored in the image history. Use BuildKit secret mounts (`RUN --mount=type=secret`) or inject secrets at runtime.
+
+  - id: TS-IMG-005
+    title: Remote script piped into a shell
+    severity: medium
+    check: dockerfile.curl_pipe_shell
+    files: *dockerfile
+    frameworks:
+      ISO27001: [A.5.21]
+      OWASP: [A08]
+      CWE: [CWE-829]
+    remediation: Download the script, verify its checksum or signature, then execute it.
+
+  # --- Secrets in code --------------------------------------------------------
+  - id: TS-SEC-001
+    title: Cloud or SaaS access token in source
+    severity: critical
+    check: secrets.provider_token
+    files: &anytext ["**/*"]
+    exclude: &lockfiles ["**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml", "**/go.sum", "**/poetry.lock", "**/Cargo.lock", "**/*.min.js", "**/*.map"]
+    frameworks:
+      ISO27001: [A.5.17]
+      OWASP: [A07]
+      CWE: [CWE-798]
+    remediation: Revoke the token with the provider immediately, then load it from a secrets manager or environment variable. Removing it from the latest commit is not enough; it stays in git history.
+
+  - id: TS-SEC-002
+    title: Private key committed to the repository
+    severity: critical
+    check: secrets.private_key
+    files: *anytext
+    exclude: *lockfiles
+    frameworks:
+      ISO27001: [A.8.24, A.5.17]
+      CWE: [CWE-321]
+    remediation: Treat the key as compromised, issue a new one, and keep private keys out of version control.
+
+  - id: TS-SEC-003
+    title: Hard-coded credential in server-side code
+    severity: high
+    check: secrets.hardcoded_credential
+    files: &serverside ["**/*.py", "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.go", "**/*.java", "**/*.kt", "**/*.rb", "**/*.php", "**/*.cs", "**/*.rs", "**/.env", "**/.env.*", "**/*.properties", "**/*.ini", "**/*.toml", "**/*.cfg"]
+    exclude: &clientside_and_tests ["**/*.html", "**/*.htm", "**/*.vue", "**/*.svelte", "**/*.jsx", "**/*.tsx", "**/public/**", "**/static/**", "**/frontend/**", "**/dashboard/**", "**/client/**", "**/tests/**", "**/test/**", "**/testdata/**", "**/__tests__/**", "**/*_test.go", "**/test_*.py", "**/*.test.*", "**/*.spec.*", "**/.env.example", "**/.env.sample"]
+    frameworks:
+      ISO27001: [A.5.17, A.8.28]
+      NIST-CSF: [PR.AA-01]
+      OWASP: [A07]
+      CWE: [CWE-798]
+    remediation: Read credentials from the environment or a secrets manager at runtime, with no literal fallback value. A default like `os.getenv("DB_PASS", "secret")` ships the secret anyway.
+
+  - id: TS-SEC-004
+    title: Credential shipped to the browser in client-side code
+    severity: critical
+    check: secrets.hardcoded_credential
+    files: ["**/*.html", "**/*.htm", "**/*.vue", "**/*.svelte", "**/*.jsx", "**/*.tsx", "**/public/**/*.{js,ts}", "**/static/**/*.{js,ts}", "**/frontend/**/*.{js,ts}", "**/dashboard/**/*.{js,ts}", "**/client/**/*.{js,ts}"]
+    exclude: ["**/*.min.js", "**/*.test.*", "**/*.spec.*"]
+    frameworks:
+      ISO27001: [A.5.17, A.8.26]
+      OWASP: [A01, A07]
+      CWE: [CWE-798]
+    remediation: Anything in client-side code is readable by every visitor. Authenticate the user's session server-side (for example an httpOnly session cookie) and authorise each request on the backend instead of handing the browser a static token.
+
+  - id: TS-SEC-005
+    title: Authorization checked against a static token
+    severity: high
+    check: secrets.static_token_comparison
+    files: *serverside
+    exclude: *clientside_and_tests
+    frameworks:
+      ISO27001: [A.8.5, A.5.15]
+      OWASP: [A07]
+      CWE: [CWE-798]
+    remediation: Replace shared static tokens with per-user, expiring credentials issued by an identity provider (OAuth2/OIDC, signed JWTs), and compare secrets in constant time.
+
+  - id: TS-SEC-006
+    title: Plaintext passwords written to a database
+    severity: high
+    check: secrets.plaintext_password_storage
+    files: ["**/*.py", "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.go", "**/*.java", "**/*.rb", "**/*.php", "**/*.cs", "**/*.sql"]
+    exclude: ["**/tests/**", "**/test/**", "**/testdata/**", "**/*_test.go", "**/test_*.py"]
+    frameworks:
+      ISO27001: [A.5.17, A.8.24]
+      PCI-DSS: ["8.3.2"]
+      OWASP: [A02]
+      CWE: [CWE-256]
+    remediation: Store only a salted, slow hash of each password (argon2id, bcrypt or scrypt). Never seed real-looking credentials in plaintext.
+
+  # --- Network and transport security ---------------------------------------
+  - id: TS-NET-001
+    title: CORS allows any origin
+    severity: medium
+    check: cors.wildcard_origin
+    files: ["**/*.py", "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.go", "**/*.java", "**/*.rb", "**/*.php", "**/*.conf", "**/*.cs"]
+    exclude: ["**/tests/**", "**/testdata/**", "**/*_test.go", "**/*.test.*", "**/*.spec.*"]
+    frameworks:
+      ISO27001: [A.8.26]
+      OWASP: [A05]
+      CWE: [CWE-942]
+    remediation: Allow-list the exact origins that need access. Wildcard origins combined with credentials let any website make authenticated requests on a user's behalf.
+
+  - id: TS-NET-002
+    title: Deprecated TLS/SSL protocol enabled
+    severity: high
+    check: tls.deprecated_protocol
+    files: &tlsconfig ["**/*.conf", "**/nginx*", "**/*.cfg", "**/httpd*", "**/*.py", "**/*.js", "**/*.ts", "**/*.go", "**/*.java"]
+    exclude: ["**/tests/**", "**/testdata/**", "**/*_test.go"]
+    frameworks:
+      ISO27001: [A.8.24, A.8.21]
+      NIST-CSF: [PR.DS-02]
+      HIPAA: [164.312(e)(1)]
+      PCI-DSS: ["4.2.1"]
+      SEBI-CSCRF: [Protect/Data-Security]
+      CWE: [CWE-326]
+    remediation: Allow only TLS 1.2 and 1.3 (`ssl_protocols TLSv1.2 TLSv1.3;`), then confirm the live endpoint with an external scanner such as testssl.sh, since runtime behaviour can differ from the config.
+
+  - id: TS-NET-003
+    title: Weak TLS cipher suite enabled
+    severity: high
+    check: tls.weak_cipher
+    files: *tlsconfig
+    exclude: ["**/tests/**", "**/testdata/**", "**/*_test.go"]
+    frameworks:
+      ISO27001: [A.8.24]
+      NIST-CSF: [PR.DS-02]
+      PCI-DSS: ["4.2.1"]
+      SEBI-CSCRF: [Protect/Data-Security]
+      CWE: [CWE-326]
+    remediation: Remove RC4, DES/3DES, NULL, EXPORT, LOW and MD5 suites. Mozilla's "intermediate" server-side TLS profile is a sound baseline.
+
+  - id: TS-NET-004
+    title: TLS certificate verification disabled
+    severity: high
+    check: tls.verification_disabled
+    files: ["**/*.py", "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.go", "**/*.java", "**/*.rb", "**/*.php", "**/*.cs", "**/*.sh", "**/.env", "**/*.yml", "**/*.yaml"]
+    exclude: ["**/tests/**", "**/testdata/**", "**/*_test.go", "**/*.test.*", "**/*.spec.*"]
+    frameworks:
+      ISO27001: [A.8.24, A.8.21]
+      OWASP: [A02]
+      CWE: [CWE-295]
+    remediation: Keep certificate verification on. For internal services, trust a private CA bundle explicitly rather than disabling verification.
+
+  # --- Personal data ----------------------------------------------------------
+  - id: TS-DAT-001
+    title: Aadhaar numbers in logs or data exports
+    severity: critical
+    check: pii.aadhaar
+    files: &datafiles ["**/*.log", "**/*.log.*", "**/*.jsonl", "**/*.ndjson", "**/*.csv", "**/*.tsv", "**/logs/**"]
+    frameworks:
+      DPDPA: [s.8(5)]
+      ISO27001: [A.8.11, A.5.34]
+      CWE: [CWE-359]
+    remediation: Mask Aadhaar numbers to the last four digits (or tokenise them) before they reach any log or export, and purge the affected files.
+
+  - id: TS-DAT-002
+    title: PAN (Permanent Account Number) in logs or data exports
+    severity: high
+    check: pii.pan_in
+    files: *datafiles
+    frameworks:
+      DPDPA: [s.8(5)]
+      ISO27001: [A.8.11]
+      CWE: [CWE-359]
+    remediation: Mask or tokenise PAN values before logging or exporting them.
+
+  - id: TS-DAT-003
+    title: Payment card numbers in logs or data exports
+    severity: critical
+    check: pii.payment_card
+    files: *datafiles
+    frameworks:
+      PCI-DSS: ["3.5.1"]
+      ISO27001: [A.8.11]
+      CWE: [CWE-312]
+    remediation: A primary account number must be unreadable wherever it is stored, logs included. Truncate to the last four digits or tokenise, and purge the affected files.
+
+  - id: TS-DAT-004
+    title: Email addresses in logs or data exports
+    severity: low
+    check: pii.email
+    files: *datafiles
+    frameworks:
+      DPDPA: [s.8(5)]
+      ISO27001: [A.8.11]
+    remediation: Log a stable pseudonymous identifier instead of the email address.
+
+  - id: TS-DAT-005
+    title: Indian mobile numbers in logs or data exports
+    severity: low
+    check: pii.phone_in
+    files: *datafiles
+    frameworks:
+      DPDPA: [s.8(5)]
+      ISO27001: [A.8.11]
+    remediation: Mask phone numbers (keep at most the last four digits) in logs and exports.
+
+  - id: TS-DAT-006
+    title: Credentials recorded in logs
+    severity: critical
+    check: pii.credential_in_log
+    files: *datafiles
+    frameworks:
+      ISO27001: [A.5.17, A.8.15]
+      OWASP: [A09]
+      CWE: [CWE-532]
+    remediation: Never log passwords, tokens or Authorization headers. Rotate every credential that appears in these logs.
+
+  - id: TS-DAT-007
+    title: Medical record numbers in logs or data exports
+    severity: high
+    check: regex.match
+    pattern: '\bMRN[-_ :]?\d{4,}\b'
+    redact: true
+    files: *datafiles
+    frameworks:
+      HIPAA: [164.312(a)(2)(iv)]
+      ISO27001: [A.8.11]
+      CWE: [CWE-359]
+    remediation: Pseudonymise patient identifiers before they leave the application, and encrypt logs that may contain PHI.
+
+  - id: TS-DAT-008
+    title: Regulated identifier stored in a plaintext column
+    description: A table definition stores Aadhaar, PAN, card, bank account, passport or medical record numbers as plain values. Anyone who can read the database, a backup or a replica can read every identifier.
+    severity: high
+    check: schema.plaintext_identifier
+    files: ["**/*.sql", "**/*.py", "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.go", "**/*.java", "**/*.kt", "**/*.rb", "**/*.php", "**/*.cs"]
+    exclude: ["**/tests/**", "**/test/**", "**/testdata/**", "**/*_test.go", "**/test_*.py", "**/*.test.*", "**/*.spec.*"]
+    frameworks:
+      DPDPA: [s.8(5)]
+      PCI-DSS: [3.5.1]
+      HIPAA: [164.312(a)(2)(iv)]
+      ISO27001: [A.8.11, A.8.24]
+      NIST-CSF: [PR.DS-01]
+      CWE: [CWE-312]
+    remediation: 'Store a keyed hash (HMAC) when the value is only matched, a token from a vault when it must be recoverable, or encrypt the column with a key held outside the database. Keep only what the process needs: for cards, the last four digits.'
+
+  - id: TS-LOG-001
+    title: Log statement writes credentials or personal data
+    severity: high
+    check: logging.sensitive_data
+    files: ["**/*.py", "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.go", "**/*.java", "**/*.kt", "**/*.rb", "**/*.php", "**/*.cs"]
+    exclude: ["**/tests/**", "**/test/**", "**/testdata/**", "**/*_test.go", "**/test_*.py", "**/*.test.*", "**/*.spec.*"]
+    frameworks:
+      ISO27001: [A.8.15, A.8.11]
+      DPDPA: [s.8(5)]
+      OWASP: [A09]
+      CWE: [CWE-532]
+    remediation: Log identifiers and outcomes, not payloads. Redact tokens, passwords and personal data with a logging filter before they reach any handler.
+
+  # --- Dependencies -----------------------------------------------------------
+  - id: TS-DEP-001
+    title: Dependency with a known vulnerability
+    severity: high
+    check: deps.known_vulnerable
+    online: true
+    files: &manifests ["**/requirements*.txt", "**/package.json", "**/go.mod"]
+    frameworks:
+      ISO27001: [A.8.8]
+      NIST-CSF: [ID.RA-01]
+      SEBI-CSCRF: [Identify/Vulnerability-Management]
+      OWASP: [A06]
+      CWE: [CWE-1395]
+    remediation: Upgrade to a fixed version (shown per advisory) and add a dependency audit (`npm audit`, `pip-audit`, `govulncheck` or this rule) as a CI gate.
+
+  - id: TS-DEP-002
+    title: Dependency version not pinned
+    description: A requirements file uses ranges or no version at all, or a package.json uses ranges with no lockfile (package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lock) beside it or in a parent directory to pin them.
+    severity: low
+    check: deps.unpinned
+    files: *manifests
+    frameworks:
+      ISO27001: [A.8.32, A.5.21]
+      NIST-CSF: [PR.PS-02]
+      CWE: [CWE-1104]
+    remediation: Pin exact versions (or commit a lockfile) so builds are reproducible and upgrades are reviewed deliberately.

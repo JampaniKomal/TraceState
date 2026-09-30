@@ -1,38 +1,89 @@
+// Package scanner runs policy rules against a target through pluggable
+// scanner modules called wires.
 package scanner
 
-import "github.com/jampanikomal/tracestate/pkg/rules"
+import (
+	"context"
+	"fmt"
+	"sort"
+	"sync"
 
-// Wire is a single, independently pluggable scanner module. TraceState's
-// six built-in wires each implement this interface. Adding a new wire -
-// a check for a different framework, a different target file type, or
-// an org-specific policy - means writing a new type that implements
-// Wire and calling RegisterWire with it. Nothing in ScanTarget, or in
-// any existing wire, needs to change.
+	"github.com/jampanikomal/tracestate/v2/pkg/finding"
+	"github.com/jampanikomal/tracestate/v2/pkg/policy"
+)
+
+// Job is one rule together with the target files its globs selected.
+type Job struct {
+	Rule  *policy.Rule
+	Files []string
+}
+
+// Options carries run-wide settings to the wires.
+type Options struct {
+	// Online allows wires to call external services (for example the OSV
+	// vulnerability database). Rules marked `online: true` are skipped, and
+	// reported as not evaluated, when it is false.
+	Online bool
+}
+
+// Wire is one independently pluggable scanner module. It owns a family of
+// checks ("compose.*", "pii.*", ...) and evaluates the rules that name them.
+//
+// A new wire needs no changes anywhere else: implement this interface and call
+// Register from an init function in the package that defines it.
 type Wire interface {
-	// Name is the short label printed in scan output, e.g.
-	// "WIRE 3: SOURCE CODE SCAN".
+	// Name is the check prefix the wire owns, e.g. "compose".
 	Name() string
-	// Scan runs this wire's checks against targetDir using the given
-	// ruleset and returns any findings.
-	Scan(targetDir string, rs rules.RuleSet) ([]Finding, error)
+	// Checks lists the full check identifiers the wire implements.
+	Checks() []string
+	// Scan evaluates jobs, each already narrowed to the files its rule's
+	// globs matched, and returns every finding.
+	Scan(ctx context.Context, t *Target, jobs []Job, opts Options) ([]finding.Finding, error)
 }
 
-var registeredWires []Wire
+var (
+	registryMu sync.RWMutex
+	registry   = map[string]Wire{}
+)
 
-// RegisterWire adds a wire to the set ScanTarget runs, in registration
-// order. The six built-in wires register themselves below, in a fixed
-// order; a custom wire - defined anywhere, in this package or another -
-// can call RegisterWire from its own init() (after importing this
-// package for its side effects) to plug into every future scan.
-func RegisterWire(w Wire) {
-	registeredWires = append(registeredWires, w)
+// Register makes a wire available to every engine. It panics on a duplicate
+// name, since that can only be a programming error.
+func Register(w Wire) {
+	registryMu.Lock()
+	defer registryMu.Unlock()
+	if _, dup := registry[w.Name()]; dup {
+		panic(fmt.Sprintf("scanner: wire %q registered twice", w.Name()))
+	}
+	registry[w.Name()] = w
 }
 
-func init() {
-	RegisterWire(infrastructureWire{})
-	RegisterWire(telemetryWire{})
-	RegisterWire(codeWire{})
-	RegisterWire(networkWire{})
-	RegisterWire(supplyChainWire{})
-	RegisterWire(databaseWire{})
+// Wires returns the registered wires sorted by name.
+func Wires() []Wire {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+	out := make([]Wire, 0, len(registry))
+	for _, w := range registry {
+		out = append(out, w)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
+	return out
+}
+
+// KnownChecks is the set of check identifiers all registered wires implement,
+// used to validate rule files.
+func KnownChecks() map[string]bool {
+	known := map[string]bool{}
+	for _, w := range Wires() {
+		for _, c := range w.Checks() {
+			known[c] = true
+		}
+	}
+	return known
+}
+
+func lookup(name string) (Wire, bool) {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+	w, ok := registry[name]
+	return w, ok
 }

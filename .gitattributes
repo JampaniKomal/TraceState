@@ -1,0 +1,4 @@
+# Keep LF everywhere: embedded rule packs and templates are hashed, so their
+# bytes must be identical on every platform.
+* text=auto eol=lf
+*.db binary

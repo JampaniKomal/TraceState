@@ -1,3 +1,10 @@
-audit_ledger.db
-tracestate_report.json
-bin/
+/bin/
+/dist/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.key
+/tracestate
+/tracestate.exe
+coverage.out
