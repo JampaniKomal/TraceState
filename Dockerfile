@@ -6,7 +6,7 @@
 # The image holds a static binary on distroless and runs as a non-root user.
 # The ledger lives in /ledger; mount a volume there to keep it between runs.
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
